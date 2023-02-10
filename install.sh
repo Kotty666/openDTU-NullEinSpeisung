@@ -6,6 +6,7 @@ SERVICE_NAME=$(basename $SCRIPT_DIR)
 chmod +x $SCRIPT_DIR/nulleinspeisung.py
 
 PIP3=$(which pip3)
+ME=$(whoami)
 
 echo 'Installing Needed packages'
 if [ -z $PIP3 ]; then
@@ -19,17 +20,19 @@ cat << EOF | sudo tee /usr/lib/systemd/system/nulleinspeisung.service
 [Unit]
 Description=Nulleinspeisung Service
 After=multi-user.target
+
 [Service]
 Type=simple
 Restart=always
-ExecStart=/usr/bin/python3 $SCRIPT_DIR/nulleinspeisung.py
+ExecStart=/usr/bin/python3 ${SCRIPT_DIR}/nulleinspeisung.py
+WorkingDirectory=${SCRIPT_DIR}
+User=${ME}
+
 [Install]
 WantedBy=multi-user.target
 EOF
-
+sudo chmod 644 /usr/lib/systemd/system/nulleinspeisung.service
 sudo systemctl daemon-reload
 sudo systemctl enable nulleinspeisung.service
-sudo systemctl start nulleinspeisung.service
-sudo systemctl status nulleinspeisung.service
 
 echo "Installation Done"
