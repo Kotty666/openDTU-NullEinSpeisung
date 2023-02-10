@@ -56,3 +56,11 @@ openDTU:
     user: ''
     password: ''
 ```
+## Installation
+
+Das Script benötigt Python3 und dort muss noch das modul pyyaml nachinstalliert werden.
+Ausgelegt ist es dass es als SystemD Service läuft, mit ausführen des install.sh scriptes werden die Abhängkeiten aufgelöst und der Systemd Service anelegt
+Für **Debian/Ubunut/Raspbian** benutzer liegt das Script **install.sh** bereit.
+´´´
+./install.sh
+´´´
