@@ -2,16 +2,11 @@
 logInterval: 1            # how often in Minuts i should log that i'm alive
 openDTU:                  # list of openDTU Instance i should contact
   dev:                    # each openDTU should be named
-    ip: 'ypse.de'   # IP or hostname fot the openDTU
+    ip: 192.168.1.200     # IP or hostname fot the openDTU
     user: admin           # User for the login
     password: openDTU42   # Password to the Specific user
 3EM:                      # List of 3EMs we shoud check
   eg:                     # name of 3EM
-    ip: 192.168.178.236   # IP or hostname for the 3EM
+    ip: 192.168.1.236     # IP or hostname for the 3EM
     user: ''              # Empty for open 3EM, user if is set
     password: ''          # Empty for open 3EM, password if a user is set
-  og:
-    ip: 192.168.178.237
-    user: ''
-    password: ''
-
