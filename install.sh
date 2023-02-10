@@ -34,5 +34,7 @@ EOF
 sudo chmod 644 /usr/lib/systemd/system/nulleinspeisung.service
 sudo systemctl daemon-reload
 sudo systemctl enable nulleinspeisung.service
+sudo systemctl start nulleinspeisung.service
+sudo systemctl status nulleinspeisung.service
 
 echo "Installation Done"
