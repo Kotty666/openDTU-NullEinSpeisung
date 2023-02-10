@@ -5,9 +5,13 @@ SERVICE_NAME=$(basename $SCRIPT_DIR)
 # Set permissions
 chmod +x $SCRIPT_DIR/nulleinspeisung.py
 
+PIP3=$(which pip3)
+
 echo 'Installing Needed packages'
-sudo apt update
-sudo apt -y install python3-pip
+if [ -z $PIP3 ]; then
+  sudo apt update
+  sudo apt -y install python3-pip
+fi
 sudo pip install pyyaml requests
 
 # create serviceFile
