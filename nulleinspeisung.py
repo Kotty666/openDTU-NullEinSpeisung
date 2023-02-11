@@ -49,10 +49,10 @@ class NullEinSpeiser:
         except requests.exceptions.Timeout:
             logging.error("RequestTimeout")
         except requests.exceptions.TooManyRedirects:
-            print("Too Many Redirects")
+            logging.error("Too Many Redirects")
         except requests.exceptions.RequestException as e:
             logging.error("No response from Shelly - %s" % (URL))
-            print(e)
+            logging.error(e)
         except:
             logging.error("No response from Shelly - %s" % (URL))
 
@@ -84,17 +84,17 @@ class NullEinSpeiser:
         except requests.exceptions.Timeout:
             logging.error("RequestTimeout")
         except requests.exceptions.TooManyRedirects:
-            print("Too Many Redirects")
+            logging.error("Too Many Redirects")
         except requests.exceptions.RequestException as e:
             logging.error("No response from OpenDTU - %s" % (URL))
-            print(e)
+            logging.error(e)
         except:
             logging.error("No response from OpenDTU - %s" % (URL))
 
         try:
             dtu_data = r.json()
         except:
-            dtu_data = {}
+            dtu_data = '{"inverters": []}'
             logging.error("Got no Json Object from openDTU - %s" % (URL))
         return dtu_data
 
@@ -118,6 +118,7 @@ class NullEinSpeiser:
                         ActiveInv[od][serial]['limit_a'] = limit_a
                         ActiveInv[od][serial]['limit_r'] = limit_r
                         ActiveInv[od][serial]['power'] = power
+                        ActiveInv[od][serial]['limit_max'] = limit_a / limit_r * 100
                         invAct += 1
                     i += 1
         else:
@@ -138,38 +139,55 @@ class NullEinSpeiser:
 
     def _setLimit(self,ip,user,password,data):
         headers = {}
-        headers['Content-Type'] = 'application/json'
+        headers['Content-Type'] = 'application/x-www-form-urlencoded'
         URL = 'http://%s/api/limit/config' % ip
         try:
-            r = requests.post(url = URL, data=json.dumps(data), timeout=30, headers=headers, auth=(user,password))
+            r = requests.post(url = URL, data=data, timeout=30, headers=headers, auth=(user,password))
         except requests.exceptions.Timeout:
             logging.error("RequestTimeout")
         except requests.exceptions.TooManyRedirects:
-            print("Too Many Redirects")
+            logging.error("Too Many Redirects")
         except requests.exceptions.RequestException as e:
             logging.error("No response from OpenDTU - %s" % (URL))
-            print(e)
+            logging.error(e)
         except:
             logging.error("No response from OpenDTU - %s" % (URL))
 
     def _incLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
-        logging.info(ActiveInv)
         if ActiveInvCount > 1:
             if usage > ActiveInv[dtu][inv]['limit_a']:
-                new_lim = 100
+                if(self.do_log):
+                    logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is alread at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_a'] ))
         else:
             for dtu in ActiveInv.keys():
                 for inv in ActiveInv[dtu]:
-                    new_lim = 0
-                    new_w_val = 0
-                    if usage > ActiveInv[dtu][inv]['limit_a']:
+                    data = False
+                    if ActiveInv[dtu][inv]['limit_r'] >= 100:
+                        if(self.do_log):
+                            logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is already at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_r'] ))
+                    elif ActiveInv[dtu][inv]['limit_max'] < usage:
                         new_lim = 100
+                        if(self.do_log):
+                            logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = ActiveInv[dtu][inv]['limit_max'] ))
+                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
+                    elif ActiveInv[dtu][inv]['limit_a'] > ActiveInv[dtu][inv]['power']:
+                        new_lim = 100
+                        if(self.do_log):
+                            logging.info('Not enough sun for Inverter with SN: {inv_sn} Increase to {pct}% Output hopefully we get more Power.'.format(inv_sn = inv, pct = new_lim ))
+                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
                     else:
-                        new_lim = int(round(100 / ActiveInv[dtu][inv]['limit_a'] * usage,0))
-                    new_w_val = int(round(ActiveInv[dtu][inv]['limit_a'] * new_lim / 100,2))
-                    data = {'serial': inv, "limit_type": 1, "limit_value": new_lim }
-                    if(self.do_log):
-                        logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
+                        new_lim = 0
+                        new_w_val = 0
+                        if usage > ActiveInv[dtu][inv]['limit_a']:
+                            new_lim = 100
+                        else:
+                            new_lim = int(round(100 / ActiveInv[dtu][inv]['limit_a'] * usage,0))
+                        new_w_val = int(round(ActiveInv[dtu][inv]['limit_a'] * new_lim / 100,2))
+                        if(self.do_log):
+                            logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
+                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
+                if data:
+                    self._setLimit(config['openDTU'][dtu]['ip'], config['openDTU'][dtu]['user'],config['openDTU'][dtu]['password'],data)
 
     def _redLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
         over_prod = round(production - usage,2)
@@ -179,9 +197,11 @@ class NullEinSpeiser:
         for dtu in ActiveInv.keys():
             new_lim = 0
             for inv in ActiveInv[dtu]:
-                new_w_val = int(round(ActiveInv[dtu][inv]['power'] * over_prod_pct / 100,2))
-                new_lim = int(round(100 - ( 100 / ActiveInv[dtu][inv]['power'] * new_w_val ),2))
-                data = {'serial': inv, "limit_type": 1, "limit_value": new_lim }
+                new_w_val = int(round(ActiveInv[dtu][inv]['power'])) - int(round(ActiveInv[dtu][inv]['power'] * over_prod_pct / 100,2))
+                if new_w_val < 0:
+                    new_w_val = 0
+                new_lim = int(round(( 100 / ActiveInv[dtu][inv]['power'] * new_w_val ),2))
+                data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
                 if(self.do_log):
                     logging.info('Reducing Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
                 self._setLimit(config['openDTU'][dtu]['ip'], config['openDTU'][dtu]['user'],config['openDTU'][dtu]['password'],data)
