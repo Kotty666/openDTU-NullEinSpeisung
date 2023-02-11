@@ -10,18 +10,25 @@ class NullEinSpeiser:
       while True:
         config = self._getConfig()
         counter = int(round((( time.time() - start_time ) % ( 60 * config['logInterval'] )) ,0))
-        if ( 0 <= counter < 5):
+        if ( 0 <= counter < 5 or config['debug']):
             self.do_log = True
         else:
             self.do_log = False
         usage = self._calcPower(config['3EM'])
         production = self._calcProduction(config['openDTU'])
-        activeInv = self._ActiveInv(config['openDTU'])
-        if usage < production:
-            self._defLimit(config,usage,production,activeInv)
-        else:
+        activeInvCount, activeInv = self._ActiveInv(config['openDTU'])
+        if activeInvCount < 1:
             if (self.do_log):
-                logging.info('Production ({}W) lower than Usage ({}W) nothing to do.'.format(round(production,2),round(usage,2)))
+                logging.info('No Inverter Online, nothing to do.')
+        else:
+            if usage < production:
+                if (self.do_log):
+                    logging.info('Production ({}W) higher than Usage ({}W) try to Reduce Production.'.format(round(production,2),round(usage,2)))
+                self._redLimit(config, usage, production, activeInv, activeInvCount)
+            else:
+                if (self.do_log):
+                    logging.info('Production ({}W) lower than Usage ({}W) try to Increase Production.'.format(round(production,2),round(usage,2)))
+                self._incLimit(config, usage, production, activeInv, activeInvCount)
         time.sleep(5)
 
     def _getConfig(self):
@@ -92,6 +99,7 @@ class NullEinSpeiser:
         return dtu_data
 
     def _ActiveInv(self,od_list):
+        invAct = 0
         if (isinstance(od_list,dict)):
             ActiveInv = {}
             for od in od_list:
@@ -110,11 +118,12 @@ class NullEinSpeiser:
                         ActiveInv[od][serial]['limit_a'] = limit_a
                         ActiveInv[od][serial]['limit_r'] = limit_r
                         ActiveInv[od][serial]['power'] = power
+                        invAct += 1
                     i += 1
         else:
             logging.error("OpenDTU is no dict - nothing to do. Will now exit!")
             exit(1)
-        return ActiveInv
+        return invAct, ActiveInv
 
     def _calcProduction(self,od_list):
         if (isinstance(od_list,dict)):
@@ -143,19 +152,30 @@ class NullEinSpeiser:
         except:
             logging.error("No response from OpenDTU - %s" % (URL))
 
+    def _incLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
+        logging.info(ActiveInv)
+        if ActiveInvCount > 1:
+            if usage > ActiveInv[dtu][inv]['limit_a']:
+                new_lim = 100
+        else:
+            for dtu in ActiveInv.keys():
+                for inv in ActiveInv[dtu]:
+                    new_lim = 0
+                    new_w_val = 0
+                    if usage > ActiveInv[dtu][inv]['limit_a']:
+                        new_lim = 100
+                    else:
+                        new_lim = int(round(100 / ActiveInv[dtu][inv]['limit_a'] * usage,0))
+                    new_w_val = int(round(ActiveInv[dtu][inv]['limit_a'] * new_lim / 100,2))
+                    data = {'serial': inv, "limit_type": 1, "limit_value": new_lim }
+                    if(self.do_log):
+                        logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
 
-    def _defLimit(self,config,usage,production,ActiveInv):
-        limit_absolute_max = 0
+    def _redLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
         over_prod = round(production - usage,2)
         over_prod_pct = round(100 - ( 100 / production * usage ))
-
         if (self.do_log):
             logging.info('Usage: {}W Production: {}W OverProduction: {}W Over Production Percent: {}%'.format(round(usage,2),round(production,2),over_prod,over_prod_pct))
-        count_inv = 0
-        for dtu in ActiveInv.keys():
-            for inv in ActiveInv[dtu]:
-                count_inv += 1
-                limit_absolute_max += ActiveInv[dtu][inv]['limit_a']
         for dtu in ActiveInv.keys():
             new_lim = 0
             for inv in ActiveInv[dtu]:

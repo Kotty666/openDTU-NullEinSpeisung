@@ -1,5 +1,6 @@
 ---
 logInterval: 1            # how often in Minuts i should log that i'm alive
+debug: True               # if True each loop will be logged, should be in normal usage set to False
 openDTU:                  # list of openDTU Instance i should contact
   dev:                    # each openDTU should be named
     ip: 192.168.1.200     # IP or hostname fot the openDTU
