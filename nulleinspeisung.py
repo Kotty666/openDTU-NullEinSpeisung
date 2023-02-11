@@ -59,7 +59,7 @@ class NullEinSpeiser:
         try:
             shelly_data = r.json()
         except:
-            shelly_data = {}
+            shelly_data = '{"total_power": 50 }'
             logging.error("Got no Json Object from Shelly - %s" % (URL))
 
         return shelly_data
@@ -94,7 +94,7 @@ class NullEinSpeiser:
         try:
             dtu_data = r.json()
         except:
-            dtu_data = '{"inverters": []}'
+            dtu_data = '{"inverters": {"reachable": false}}'
             logging.error("Got no Json Object from openDTU - %s" % (URL))
         return dtu_data
 
@@ -154,40 +154,48 @@ class NullEinSpeiser:
             logging.error("No response from OpenDTU - %s" % (URL))
 
     def _incLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
-        if ActiveInvCount > 10:
-            if usage > ActiveInv[dtu][inv]['limit_a']:
-                if(self.do_log):
-                    logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is alread at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_a'] ))
-        else:
-            for dtu in ActiveInv.keys():
-                for inv in ActiveInv[dtu]:
-                    data = False
-                    if ActiveInv[dtu][inv]['limit_r'] >= 100:
-                        if(self.do_log):
-                            logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is already at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_r'] ))
-                    elif ActiveInv[dtu][inv]['limit_max'] < usage:
+        remainingInvCount = ActiveInvCount
+        pwrRemain = usage - production
+        do_break = False
+        for dtu in ActiveInv.keys():
+            if do_break:
+                break
+            for inv in ActiveInv[dtu]:
+                data = False
+                if pwrRemain < 1:
+                    if(self.do_log):
+                        logging.info('Stopping loop Should produce enough power')
+                    do_break = True
+                    break
+                if ActiveInv[dtu][inv]['limit_r'] >= 100:
+                    if(self.do_log):
+                        logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is already at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_r'] ))
+                elif ActiveInv[dtu][inv]['limit_max'] < usage:
+                    new_lim = 100
+                    incLim = ActiveInv[dtu][inv]['limit_max'] - ActiveInv[dtu][inv]['power']
+                    pwrRemain -= incLim
+                    if(self.do_log):
+                        logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = ActiveInv[dtu][inv]['limit_max'] ))
+                    data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
+                elif ActiveInv[dtu][inv]['limit_a'] > ActiveInv[dtu][inv]['power']:
+                    new_lim = 100
+                    if(self.do_log):
+                        logging.info('Not enough sun for Inverter with SN: {inv_sn} Increase to {pct}% Output hopefully we get more Power.'.format(inv_sn = inv, pct = new_lim ))
+                    data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
+                else:
+                    new_lim = 0
+                    new_w_val = 0
+                    if usage > ActiveInv[dtu][inv]['limit_a']:
                         new_lim = 100
-                        if(self.do_log):
-                            logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = ActiveInv[dtu][inv]['limit_max'] ))
-                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
-                    elif ActiveInv[dtu][inv]['limit_a'] > ActiveInv[dtu][inv]['power']:
-                        new_lim = 100
-                        if(self.do_log):
-                            logging.info('Not enough sun for Inverter with SN: {inv_sn} Increase to {pct}% Output hopefully we get more Power.'.format(inv_sn = inv, pct = new_lim ))
-                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
                     else:
-                        new_lim = 0
-                        new_w_val = 0
-                        if usage > ActiveInv[dtu][inv]['limit_a']:
-                            new_lim = 100
-                        else:
-                            new_lim = int(round(100 / ActiveInv[dtu][inv]['limit_a'] * usage,0))
-                        new_w_val = int(round(ActiveInv[dtu][inv]['limit_a'] * new_lim / 100,2))
-                        if(self.do_log):
-                            logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
-                        data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
-                if data:
-                    self._setLimit(config['openDTU'][dtu]['ip'], config['openDTU'][dtu]['user'],config['openDTU'][dtu]['password'],data)
+                        new_lim = int(round(100 / ActiveInv[dtu][inv]['limit_a'] * usage,0))
+                    new_w_val = int(round(ActiveInv[dtu][inv]['limit_a'] * new_lim / 100,2))
+                    pwrRemain -= new_w_val
+                    if(self.do_log):
+                        logging.info('Increase Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
+                    data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
+            if data:
+                self._setLimit(config['openDTU'][dtu]['ip'], config['openDTU'][dtu]['user'],config['openDTU'][dtu]['password'],data)
 
     def _redLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
         over_prod = round(production - usage,2)
