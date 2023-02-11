@@ -154,7 +154,7 @@ class NullEinSpeiser:
             logging.error("No response from OpenDTU - %s" % (URL))
 
     def _incLimit(self,config,usage,production,ActiveInv, ActiveInvCount):
-        if ActiveInvCount > 1:
+        if ActiveInvCount > 10:
             if usage > ActiveInv[dtu][inv]['limit_a']:
                 if(self.do_log):
                     logging.info('Could not Increase Inverter with SN: {inv_sn} - the Limit is alread at {inv_pct}%.'.format(inv_sn = inv, inv_pct = ActiveInv[dtu][inv]['limit_a'] ))
