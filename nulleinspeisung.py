@@ -29,7 +29,7 @@ class NullEinSpeiser:
                 if (self.do_log):
                     logging.info('Production ({}W) lower than Usage ({}W) try to Increase Production.'.format(round(production,2),round(usage,2)))
                 self._incLimit(config, usage, production, activeInv, activeInvCount)
-        time.sleep(5)
+        time.sleep(config['checkInterval'])
 
     def _getConfig(self):
         with open('config.yaml', 'r') as stream:
