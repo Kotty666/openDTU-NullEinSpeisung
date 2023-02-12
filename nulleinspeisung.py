@@ -104,6 +104,8 @@ class NullEinSpeiser:
             ActiveInv = {}
             for od in od_list:
                 sdata = self._getOpenDTUData(od_list[od]['ip'])
+                if not isinstance(sdata,dict):
+                    continue
                 ActiveInv[od] = {}
                 i = 0
                 while i < len(sdata['inverters']):
