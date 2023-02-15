@@ -114,7 +114,11 @@ class NullEinSpeiser:
                         name    = sdata['inverters'][i]['name']
                         limit_a = sdata['inverters'][i]['limit_absolute']
                         limit_r = sdata['inverters'][i]['limit_relative']
-                        power   = sdata['inverters'][i]['0']['Power']['v']
+                        try:
+                            power = sdata['inverters'][i]['0']['Power']['v']
+                        except:
+
+                            power = sdata['inverters'][i]['AC']['0']['Power']['v']
                         ActiveInv[od][serial] = {}
                         ActiveInv[od][serial]['name'] = name
                         ActiveInv[od][serial]['limit_a'] = limit_a
