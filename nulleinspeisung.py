@@ -215,8 +215,8 @@ class NullEinSpeiser:
                 if new_w_val < 0:
                     new_w_val = 0
                 new_lim = int(round(( 100 / ActiveInv[dtu][inv]['power'] * new_w_val ),2))
-                if new_lim < 2:
-                    new_lim = 2
+                if new_lim < 3:
+                    new_lim = 3
                 data = 'data={{"serial": {inv}, "limit_type": 1, "limit_value": {new_lim} }}'.format(inv = inv, new_lim = new_lim)
                 if(self.do_log):
                     logging.info('Reducing Inverter with SN: {inv_sn} to {pct}% Output the expectet Watt Value should be {w_val}W.'.format(inv_sn = inv, pct = new_lim, w_val = new_w_val ))
